@@ -1,16 +1,9 @@
 # Web client POST a request for a file
-# The (user_id, file request) is added to request mangaer
+# The (user_id, file request) is added to request manager
 # Assign the mobile app user to the request
 # The mobile app user GET the requested assigned to it from server
 # Mobile app user POST request response
 
-# Request will need to be assigned to as approver
-# 1. Have a class for Request
-#   Contains the request and the approver_id
-#   Will also need to create a class for Approver
-#       Will have reference to PendingRequest as well
-#       Can update PendingRequest with RequestResponse
-#       Approver Pending
 from enum import Enum
 import time
 
@@ -23,7 +16,7 @@ class RequestStatus(Enum):
     approved = 3
     disapproved = 4
 
-TIMEOUT_THRESHOLD = 30
+TIMEOUT_THRESHOLD = 120
 
 class ApproverAssigner:    
     def assign_approver(self, user_id, file_id):
@@ -35,6 +28,9 @@ class RequestManager:
         self.requests = {}
         self.approvers = approvers
         self.approver_assigner = approver_assigner
+        
+        # Keep track of the number of requests made
+        self.num_requests = 0
 
     def get_pending(self, approver_id):
         return self.approvers[approver_id].check_pending()
@@ -58,23 +54,23 @@ class RequestManager:
                 # This should be handled by the server instead
                 request.status = RequestStatus.timeout
                 return request.status.value
-
+            
     def create_request(self, user_id, file_id):
         print("CREATING REQUEST")
-
         if (user_id, file_id) not in self.requests:
-            # Assign an approver
 
+            # Assign an approver
             approver_id = self.approver_assigner.assign_approver(user_id, file_id)
-            print("approver_id", approver_id)
+            
             request_time = time.time()
-            print("request_time", request_time)
-            request = FileRequest(user_id, file_id, request_time, approver_id)
+            request = FileRequest(user_id, file_id, request_time, approver_id, self.num_requests)
 
             self.approvers[approver_id].add_request(request)
 
-            self.requests[(user_id, file_id)] = request 
-        print("SEDNING BACK REQUEST TIME")
+            self.requests[(user_id, file_id)] = request             
+            self.num_requests += 1
+
+        print("Sending BACK REQUEST TIME")
         return self.requests[(user_id, file_id)].request_time
 
 
@@ -109,16 +105,34 @@ class Approver:
 
 
 class FileRequest:
-    def __init__(self, user_id, file_id, request_time, approver_id):
+    def __init__(self, user_id, file_id, request_time, approver_id, request_id):
         self.user_id = user_id
         self.file_id = file_id
         self.request_time = request_time
         self.status = RequestStatus.pending
         self.approver_id = approver_id
+        self.request_id = request_id
     
     def request_dict(self):
         return {
+            "username": user_id_to_name[self.user_id],
+            "filename": file_id_to_name[self.file_id],
+            "request_time": self.request_time,
+            "fileType": "Sensitive",
+            "request_id": self.request_id,
             "user_id": self.user_id,
-            "file_id": self.file_id,
-            "request_time": self.request_time}
+            "file_id": self.file_id 
+            }
 
+
+file_id_to_name = {
+    0: "foo.txt",
+    1: "temp.txt"
+}
+
+user_id_to_name = {
+    0: "John Doe",
+    1: "Joe Foo",
+    2: "Bob Bar",
+    3: "Alice Baz"
+}
